@@ -27,6 +27,12 @@ namespace QuantConnect.Lean.Engine.DataFeeds.Queues
     public class LiveDataQueue : IDataQueueHandler
     {
         /// <summary>
+        /// Event fired when an error is detected
+        /// </summary>
+        /// <remarks>Will be use to stop the algorithm</remarks>
+        public event EventHandler<DataQueueHandlerErrorEventArgs> ErrorEvent;
+
+        /// <summary>
         /// Desktop/Local doesn't support live data from this handler
         /// </summary>
         /// <returns>Tick</returns>

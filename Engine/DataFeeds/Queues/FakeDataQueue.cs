@@ -41,6 +41,11 @@ namespace QuantConnect.Lean.Engine.DataFeeds.Queues
         private readonly object _sync = new object();
 
         /// <summary>
+        /// Event fired when an error is detected
+        /// </summary>
+        public event EventHandler<DataQueueHandlerErrorEventArgs> ErrorEvent;
+
+        /// <summary>
         /// Initializes a new instance of the <see cref="FakeDataQueue"/> class to randomly emit data for each symbol
         /// </summary>
         public FakeDataQueue()

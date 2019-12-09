@@ -95,6 +95,14 @@ namespace QuantConnect.Lean.Engine.DataFeeds
             _dataProvider = dataProvider;
             _channelProvider = GetDataChannelProvider();
 
+            _dataQueueHandler.ErrorEvent += (sender, args) =>
+            {
+                var message = $"Data queue handler ({_dataQueueHandler.GetType()}) error detected: {args.Message}";
+                Log.Error($"LiveTradingDataFeed(): {message}");
+                _algorithm.SetStatus(AlgorithmStatus.RuntimeError);
+                _algorithm.SetRunTimeError(new Exception(message));
+            };
+
             _frontierTimeProvider = dataFeedTimeProvider.FrontierTimeProvider;
             _customExchange = new BaseDataExchange("CustomDataExchange") {SleepInterval = 10};
             // sleep is controlled on this exchange via the GetNextTicksEnumerator

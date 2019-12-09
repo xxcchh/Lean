@@ -55,6 +55,12 @@ namespace QuantConnect.ToolBox.IQFeed
         public override int DataPointCount => _dataPointCount;
 
         /// <summary>
+        /// Event fired when an error is detected
+        /// </summary>
+        /// <remarks>Will be use to stop the algorithm</remarks>
+        public event EventHandler<DataQueueHandlerErrorEventArgs> ErrorEvent;
+
+        /// <summary>
         /// IQFeedDataQueueHandler is an implementation of IDataQueueHandler:
         /// </summary>
         public IQFeedDataQueueHandler()

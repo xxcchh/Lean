@@ -81,6 +81,11 @@ namespace QuantConnect.Brokerages.Fxcm
         public bool EnableOnlyHistoryRequests { get; set; }
 
         /// <summary>
+        /// Event fired when an error is detected
+        /// </summary>
+        public event EventHandler<DataQueueHandlerErrorEventArgs> ErrorEvent;
+
+        /// <summary>
         /// Static constructor for the <see cref="FxcmBrokerage"/> class
         /// </summary>
         static FxcmBrokerage()

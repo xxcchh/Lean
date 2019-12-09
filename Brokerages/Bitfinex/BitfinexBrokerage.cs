@@ -368,6 +368,12 @@ namespace QuantConnect.Brokerages.Bitfinex
         #endregion
 
         #region IDataQueueHandler
+
+        /// <summary>
+        /// Event fired when an error is detected
+        /// </summary>
+        public event EventHandler<DataQueueHandlerErrorEventArgs> ErrorEvent;
+
         /// <summary>
         /// Get the next ticks from the live trading data queue
         /// </summary>

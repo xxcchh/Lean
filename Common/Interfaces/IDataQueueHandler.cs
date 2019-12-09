@@ -14,6 +14,7 @@
  *
 */
 
+using System;
 using System.Collections.Generic;
 using System.ComponentModel.Composition;
 using QuantConnect.Data;
@@ -27,6 +28,11 @@ namespace QuantConnect.Interfaces
     [InheritedExport(typeof(IDataQueueHandler))]
     public interface IDataQueueHandler
     {
+        /// <summary>
+        /// Event fired when an error is detected
+        /// </summary>
+        event EventHandler<DataQueueHandlerErrorEventArgs> ErrorEvent;
+
         /// <summary>
         /// Get the next ticks from the live trading data queue
         /// </summary>

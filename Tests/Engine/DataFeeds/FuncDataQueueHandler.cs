@@ -34,6 +34,12 @@ namespace QuantConnect.Tests.Engine.DataFeeds
         private readonly Func<FuncDataQueueHandler, IEnumerable<BaseData>> _getNextTicksFunction;
 
         /// <summary>
+        /// Event fired when an error is detected
+        /// </summary>
+        /// <remarks>Will be use to stop the algorithm</remarks>
+        public event EventHandler<DataQueueHandlerErrorEventArgs> ErrorEvent;
+
+        /// <summary>
         /// Gets the subscriptions currently being managed by the queue handler
         /// </summary>
         public List<Symbol> Subscriptions

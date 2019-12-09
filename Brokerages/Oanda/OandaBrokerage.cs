@@ -40,6 +40,11 @@ namespace QuantConnect.Brokerages.Oanda
         private readonly OandaRestApiBase _api;
 
         /// <summary>
+        /// Event fired when an error is detected
+        /// </summary>
+        public event EventHandler<DataQueueHandlerErrorEventArgs> ErrorEvent;
+
+        /// <summary>
         /// The maximum number of bars per historical data request
         /// </summary>
         public const int MaxBarsPerRequest = 5000;

@@ -155,6 +155,11 @@ namespace QuantConnect.Brokerages.InteractiveBrokers
         private readonly bool _enableDelayedStreamingData = Config.GetBool("ib-enable-delayed-streaming-data");
 
         /// <summary>
+        /// Event fired when an error is detected
+        /// </summary>
+        public event EventHandler<DataQueueHandlerErrorEventArgs> ErrorEvent;
+
+        /// <summary>
         /// Returns true if we're currently connected to the broker
         /// </summary>
         public override bool IsConnected => _client != null && _client.Connected && !_disconnected1100Fired;

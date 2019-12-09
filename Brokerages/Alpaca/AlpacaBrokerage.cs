@@ -20,7 +20,6 @@ using System.Threading;
 using NodaTime;
 using QuantConnect.Brokerages.Alpaca.Markets;
 using QuantConnect.Data;
-using QuantConnect.Data.Market;
 using QuantConnect.Interfaces;
 using QuantConnect.Logging;
 using QuantConnect.Orders;
@@ -70,6 +69,11 @@ namespace QuantConnect.Brokerages.Alpaca
         private readonly MarketHoursDatabase _marketHours;
 
         private readonly Dictionary<Symbol, DateTimeZone> _symbolExchangeTimeZones = new Dictionary<Symbol, DateTimeZone>();
+
+        /// <summary>
+        /// Event fired when an error is detected
+        /// </summary>
+        public event EventHandler<DataQueueHandlerErrorEventArgs> ErrorEvent;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="AlpacaBrokerage"/> class.

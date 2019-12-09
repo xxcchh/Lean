@@ -58,6 +58,12 @@ namespace QuantConnect.ToolBox.IEX
 
         public string Endpoint { get; internal set; }
 
+        /// <summary>
+        /// Event fired when an error is detected
+        /// </summary>
+        /// <remarks>Will be use to stop the algorithm</remarks>
+        public event EventHandler<DataQueueHandlerErrorEventArgs> ErrorEvent;
+
         public bool IsConnected
         {
             get { return _manager.ReadyState == Manager.ReadyStateEnum.OPEN; }

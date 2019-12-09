@@ -124,6 +124,11 @@ namespace QuantConnect.Brokerages.Oanda
         public const string OandaAgentDefaultValue = "QuantConnect/0.0.0 (LEAN)";
 
         /// <summary>
+        /// Event fired when an error is detected
+        /// </summary>
+        public event EventHandler<DataQueueHandlerErrorEventArgs> ErrorEvent;
+
+        /// <summary>
         /// Initializes a new instance of the <see cref="OandaRestApiBase"/> class.
         /// </summary>
         /// <param name="symbolMapper">The symbol mapper.</param>

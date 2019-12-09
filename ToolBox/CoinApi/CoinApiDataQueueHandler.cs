@@ -52,6 +52,12 @@ namespace QuantConnect.ToolBox.CoinApi
         private readonly Dictionary<Symbol, Tick> _previousQuotes = new Dictionary<Symbol, Tick>();
 
         /// <summary>
+        /// Event fired when an error is detected
+        /// </summary>
+        /// <remarks>Will be use to stop the algorithm</remarks>
+        public event EventHandler<DataQueueHandlerErrorEventArgs> ErrorEvent;
+
+        /// <summary>
         /// Initializes a new instance of the <see cref="CoinApiDataQueueHandler"/> class
         /// </summary>
         public CoinApiDataQueueHandler()

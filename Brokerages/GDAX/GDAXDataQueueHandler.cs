@@ -13,6 +13,7 @@
  * limitations under the License.
 */
 
+using System;
 using System.Collections.Generic;
 using QuantConnect.Data;
 using QuantConnect.Interfaces;
@@ -27,6 +28,11 @@ namespace QuantConnect.Brokerages.GDAX
     [BrokerageFactory(typeof(GDAXBrokerageFactory))]
     public class GDAXDataQueueHandler : GDAXBrokerage, IDataQueueHandler
     {
+        /// <summary>
+        /// Event fired when an error is detected
+        /// </summary>
+        public event EventHandler<DataQueueHandlerErrorEventArgs> ErrorEvent;
+
         /// <summary>
         /// Initializes a new instance of the <see cref="GDAXDataQueueHandler"/> class
         /// </summary>

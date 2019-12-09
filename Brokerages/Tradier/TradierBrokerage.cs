@@ -24,6 +24,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Newtonsoft.Json;
 using QuantConnect.Configuration;
+using QuantConnect.Data;
 using QuantConnect.Interfaces;
 using QuantConnect.Logging;
 using QuantConnect.Orders;
@@ -120,6 +121,11 @@ namespace QuantConnect.Brokerages.Tradier
         {
             get { return _previousResponseRaw; }
         }
+
+        /// <summary>
+        /// Event fired when an error is detected
+        /// </summary>
+        public event EventHandler<DataQueueHandlerErrorEventArgs> ErrorEvent;
 
         /// <summary>
         /// Create a new Tradier Object:
