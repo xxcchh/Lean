@@ -153,64 +153,110 @@ namespace QuantConnect.Brokerages.Oanda
         /// <returns>True if the request for a new order has been placed, false otherwise</returns>
         public override bool PlaceOrder(Order order)
         {
-            var orderFee = OrderFee.Zero;
-            var marketOrderFillQuantity = 0;
-            var marketOrderFillPrice = 0m;
-            var marketOrderRemainingQuantity = 0;
-            var marketOrderStatus = OrderStatus.Filled;
-            var request = GenerateOrderRequest(order);
-            order.PriceCurrency = SecurityProvider.GetSecurity(order.Symbol).SymbolProperties.QuoteCurrency;
-
-            lock (Locker)
+            try
             {
-                var response = _apiRest.CreateOrder(Authorization, AccountId, request);
-                order.BrokerId.Add(response.Data.OrderCreateTransaction.Id);
+                if (order == null)
+                    Log.Trace("order is null");
+                if (order.Symbol == null)
+                    Log.Trace("order symbol is null");
 
-                // Market orders are special, due to the callback not being triggered always,
-                // if the order was Filled/PartiallyFilled, find fill quantity and price and inform the user
-                if (order.Type == OrderType.Market)
+                var orderFee = OrderFee.Zero;
+                var marketOrderFillQuantity = 0;
+                var marketOrderFillPrice = 0m;
+                var marketOrderRemainingQuantity = 0;
+                var marketOrderStatus = OrderStatus.Filled;
+                var request = GenerateOrderRequest(order);
+                if (request == null)
+                    Log.Trace("request is null");
+
+                order.PriceCurrency = SecurityProvider.GetSecurity(order.Symbol).SymbolProperties.QuoteCurrency;
+
+                lock (Locker)
                 {
-                    var fill = response.Data.OrderFillTransaction;
-                    marketOrderFillPrice = fill.Price.ConvertInvariant<decimal>();
+                    if (_apiRest == null)
+                        Log.Trace("_apiRest is null");
 
-                    if (fill.TradeOpened != null && fill.TradeOpened.TradeID.Length > 0)
-                    {
-                        marketOrderFillQuantity = fill.TradeOpened.Units.ConvertInvariant<int>();
-                    }
+                    var response = _apiRest.CreateOrder(Authorization, AccountId, request);
+                    if (response == null)
+                        Log.Trace("response is null");
+                    if (response.Data == null)
+                        Log.Trace("response.Data is null");
+                    if (response.Data.OrderCreateTransaction == null)
+                        Log.Trace("response.Data.OrderCreateTransaction is null");
+                    if (response.Data.OrderCreateTransaction.Id == null)
+                        Log.Trace("response.Data.OrderCreateTransaction.Id is null");
 
-                    if (fill.TradeReduced != null && fill.TradeReduced.TradeID.Length > 0)
-                    {
-                        marketOrderFillQuantity = fill.TradeReduced.Units.ConvertInvariant<int>();
-                    }
+                    order.BrokerId.Add(response.Data.OrderCreateTransaction.Id);
 
-                    if (fill.TradesClosed != null && fill.TradesClosed.Count > 0)
+                    // Market orders are special, due to the callback not being triggered always,
+                    // if the order was Filled/PartiallyFilled, find fill quantity and price and inform the user
+                    if (order.Type == OrderType.Market)
                     {
-                        marketOrderFillQuantity += fill.TradesClosed.Sum(trade => trade.Units.ConvertInvariant<int>());
-                    }
+                        if (response.Data.OrderFillTransaction == null)
+                            Log.Trace("response.Data.OrderFillTransaction is null");
+                        var fill = response.Data.OrderFillTransaction;
+                        if (fill == null)
+                            Log.Trace("fill is null");
+                        if (fill.Price == null)
+                            Log.Trace("fill.Price is null");
+                        if (fill.TradeOpened == null)
+                            Log.Trace("fill.TradeOpened is null");
+                        if (fill.TradeOpened.TradeID == null)
+                            Log.Trace("fill.TradeOpened.TradeID is null");
+                        if (fill.TradeOpened.Units == null)
+                            Log.Trace("fill.TradeOpened.Units is null");
+                        if (fill.TradesClosed == null)
+                            Log.Trace("fill.TradeOpened.TradeID is null");
 
-                    marketOrderRemainingQuantity = Convert.ToInt32(order.AbsoluteQuantity - Math.Abs(marketOrderFillQuantity));
-                    if (marketOrderRemainingQuantity > 0)
-                    {
-                        marketOrderStatus = OrderStatus.PartiallyFilled;
-                        // The order was not fully filled lets save it so the callback can inform the user
-                        PendingFilledMarketOrders[order.Id] = marketOrderStatus;
+                        marketOrderFillPrice = fill.Price.ConvertInvariant<decimal>();
+
+                        if (fill.TradeOpened != null && fill.TradeOpened.TradeID.Length > 0)
+                        {
+                            marketOrderFillQuantity = fill.TradeOpened.Units.ConvertInvariant<int>();
+                        }
+
+                        if (fill.TradeReduced != null && fill.TradeReduced.TradeID.Length > 0)
+                        {
+                            marketOrderFillQuantity = fill.TradeReduced.Units.ConvertInvariant<int>();
+                        }
+
+                        if (fill.TradesClosed != null && fill.TradesClosed.Count > 0)
+                        {
+                            marketOrderFillQuantity += fill.TradesClosed.Sum(trade => trade.Units.ConvertInvariant<int>());
+                        }
+
+                        marketOrderRemainingQuantity = Convert.ToInt32(order.AbsoluteQuantity - Math.Abs(marketOrderFillQuantity));
+                        if (marketOrderRemainingQuantity > 0)
+                        {
+                            marketOrderStatus = OrderStatus.PartiallyFilled;
+                            // The order was not fully filled lets save it so the callback can inform the user
+                            if (PendingFilledMarketOrders == null)
+                                Log.Trace("PendingFilledMarketOrders is null");
+                            PendingFilledMarketOrders[order.Id] = marketOrderStatus;
+                        }
                     }
                 }
-            }
-            OnOrderEvent(new OrderEvent(order, DateTime.UtcNow, orderFee) { Status = OrderStatus.Submitted });
+                OnOrderEvent(new OrderEvent(order, DateTime.UtcNow, orderFee) { Status = OrderStatus.Submitted });
 
-            // If 'marketOrderRemainingQuantity < order.AbsoluteQuantity' is false it means the order was not even PartiallyFilled, wait for callback
-            if (order.Type == OrderType.Market && marketOrderRemainingQuantity < order.AbsoluteQuantity)
-            {
-                OnOrderEvent(new OrderEvent(order, DateTime.UtcNow, orderFee, "Oanda Fill Event")
+                // If 'marketOrderRemainingQuantity < order.AbsoluteQuantity' is false it means the order was not even PartiallyFilled, wait for callback
+                if (order.Type == OrderType.Market && marketOrderRemainingQuantity < order.AbsoluteQuantity)
                 {
-                    Status = marketOrderStatus,
-                    FillPrice = marketOrderFillPrice,
-                    FillQuantity = marketOrderFillQuantity
-                });
-            }
+                    OnOrderEvent(new OrderEvent(order, DateTime.UtcNow, orderFee, "Oanda Fill Event")
+                    {
+                        Status = marketOrderStatus,
+                        FillPrice = marketOrderFillPrice,
+                        FillQuantity = marketOrderFillQuantity
+                    });
+                }
 
-            return true;
+                return true;
+
+            }
+            catch (Exception e)
+            {
+                Log.Trace($"{e.Message} :: {e.StackTrace}");
+                return true;
+            }
         }
 
         /// <summary>
