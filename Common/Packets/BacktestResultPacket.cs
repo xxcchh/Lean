@@ -18,7 +18,6 @@ using System;
 using System.Collections.Generic;
 using Newtonsoft.Json;
 using QuantConnect.Logging;
-using QuantConnect.Orders;
 using QuantConnect.Statistics;
 
 namespace QuantConnect.Packets
@@ -226,6 +225,7 @@ namespace QuantConnect.Packets
             RollingWindow = parameters.RollingWindow;
             TotalPerformance = parameters.TotalPerformance;
             AlphaRuntimeStatistics = parameters.AlphaRuntimeStatistics;
+            OrderEvents = parameters.OrderEvents;
         }
     }
 } // End of Namespace:

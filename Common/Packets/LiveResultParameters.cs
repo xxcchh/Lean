@@ -51,6 +51,7 @@ namespace QuantConnect.Packets
             CashBook cashBook,
             IDictionary<string, string> statistics,
             IDictionary<string, string> runtimeStatistics,
+            List<OrderEvent> orderEvents,
             IDictionary<string, string> serverStatistics = null,
             AlphaRuntimeStatistics alphaRuntimeStatistics = null)
         {
@@ -63,6 +64,7 @@ namespace QuantConnect.Packets
             RuntimeStatistics = runtimeStatistics;
             ServerStatistics = serverStatistics ?? OS.GetServerStatistics();
             AlphaRuntimeStatistics = alphaRuntimeStatistics;
+            OrderEvents = orderEvents;
         }
     }
 }

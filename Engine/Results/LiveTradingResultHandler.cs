@@ -21,6 +21,7 @@ using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Newtonsoft.Json;
 using QuantConnect.Configuration;
 using QuantConnect.Data.Market;
 using QuantConnect.Interfaces;
@@ -51,8 +52,10 @@ namespace QuantConnect.Lean.Engine.Results
         private DateTime _nextChartTrimming;
         private DateTime _nextLogStoreUpdate;
         private DateTime _nextStatisticsUpdate;
-        private DateTime _nextStatusUpdate;
+        private DateTime _nextDailyUpdate;
+        private DateTime _orderEventStoringDate;
         private readonly object _statusUpdateLock;
+        private int _nextOrderEventsStoring;
 
         //Log Message Store:
         private DateTime _nextSample;
@@ -97,7 +100,7 @@ namespace QuantConnect.Lean.Engine.Results
             if (_job == null) throw new Exception("LiveResultHandler.Constructor(): Submitted Job type invalid.");
             JobId = _job.DeployId;
             CompileId = _job.CompileId;
-            PreviousUtcSampleTime = DateTime.UtcNow;
+            _orderEventStoringDate = PreviousUtcSampleTime = DateTime.UtcNow;
         }
 
         /// <summary>
@@ -159,6 +162,8 @@ namespace QuantConnect.Lean.Engine.Results
                         var stopwatch = Stopwatch.StartNew();
                         deltaOrders = GetDeltaOrders(shouldStop: orderCount => stopwatch.ElapsedMilliseconds > 15);
                     }
+                    var deltaOrderEvents = OrderEvents.Skip(LastOrderEventCount).Take(50).ToList();
+                    LastOrderEventCount += deltaOrderEvents.Count;
 
                     //Create and send back the changes in chart since the algorithm started.
                     var deltaCharts = new Dictionary<string, Chart>();
@@ -223,7 +228,7 @@ namespace QuantConnect.Lean.Engine.Results
 
                     // since we're sending multiple packets, let's do it async and forget about it
                     // chart data can get big so let's break them up into groups
-                    var splitPackets = SplitPackets(deltaCharts, deltaOrders, holdings, Algorithm.Portfolio.CashBook, deltaStatistics, runtimeStatistics, serverStatistics);
+                    var splitPackets = SplitPackets(deltaCharts, deltaOrders, holdings, Algorithm.Portfolio.CashBook, deltaStatistics, runtimeStatistics, serverStatistics, deltaOrderEvents);
 
                     foreach (var liveResultPacket in splitPackets)
                     {
@@ -244,8 +249,17 @@ namespace QuantConnect.Lean.Engine.Results
                                 DictionarySafeAdd(chartComplete, safeName, chart.Value.Clone(), "chartComplete");
                             }
                         }
+
+                        // we store all order events every 10x chart updates => 10 minutes
+                        List<OrderEvent> orderEvents = null;
+                        if (++_nextOrderEventsStoring >= 10)
+                        {
+                            _nextOrderEventsStoring = 0;
+                            orderEvents = OrderEvents.ToList();
+                        }
+
                         var orders = new Dictionary<int, Order>(TransactionHandler.Orders);
-                        var complete = new LiveResultPacket(_job, new LiveResult(new LiveResultParameters(chartComplete, orders, Algorithm.Transactions.TransactionRecord, holdings, Algorithm.Portfolio.CashBook, deltaStatistics, runtimeStatistics, serverStatistics)));
+                        var complete = new LiveResultPacket(_job, new LiveResult(new LiveResultParameters(chartComplete, orders, Algorithm.Transactions.TransactionRecord, holdings, Algorithm.Portfolio.CashBook, deltaStatistics, runtimeStatistics, orderEvents, serverStatistics)));
                         StoreResult(complete);
                         _nextChartsUpdate = DateTime.UtcNow.AddMinutes(1);
                         Log.Debug("LiveTradingResultHandler.Update(): End-store result");
@@ -291,7 +305,7 @@ namespace QuantConnect.Lean.Engine.Results
                         _nextStatisticsUpdate = utcNow.AddMinutes(1);
                     }
 
-                    if (utcNow > _nextStatusUpdate)
+                    if (utcNow > _nextDailyUpdate)
                     {
                         var chartComplete = new Dictionary<string, Chart>();
                         lock (ChartLock)
@@ -309,6 +323,21 @@ namespace QuantConnect.Lean.Engine.Results
                             chartComplete,
                             new SortedDictionary<DateTime, decimal>(Algorithm.Transactions.TransactionRecord),
                             serverStatistics);
+
+                        // we purge and store all order events based on current date
+                        var orderEvents = new List<OrderEvent>();
+                        OrderEvent orderEvent;
+                        while (OrderEvents.TryPeek(out orderEvent)
+                               // get all the order events of the previous day
+                               && orderEvent.UtcTime < utcNow.Date
+                               && OrderEvents.TryDequeue(out orderEvent))
+                        {
+                            orderEvents.Add(orderEvent);
+                        }
+                        StoreOrderEvents(_orderEventStoringDate, orderEvents);
+                        // start storing in a new date file
+                        _orderEventStoringDate = utcNow;
+
                         SetNextStatusUpdate();
                     }
 
@@ -345,11 +374,29 @@ namespace QuantConnect.Lean.Engine.Results
             } // End Update Charts:
         }
 
+        /// <summary>
+        /// Stores the order events
+        /// </summary>
+        /// <param name="utcTime">The utc time used to generate the file path</param>
+        /// <param name="orderEvents">The order events to store</param>
+        protected override void StoreOrderEvents(DateTime utcTime, List<OrderEvent> orderEvents)
+        {
+            if (orderEvents.Count <= 0)
+            {
+                return;
+            }
+
+            var path = $"{JobId}-{utcTime:yyyy-MM-dd}-order-events.json";
+            var data = JsonConvert.SerializeObject(orderEvents, Formatting.None);
+
+            File.WriteAllText(path, data);
+        }
+
         private void SetNextStatusUpdate()
         {
             // Update the status json file each day at 1am UTC
             // after the daily performance has been sampled
-            _nextStatusUpdate = DateTime.UtcNow.Date.AddDays(1).AddHours(1);
+            _nextDailyUpdate = DateTime.UtcNow.Date.AddDays(1).AddHours(1);
         }
 
         /// <summary>
@@ -386,6 +433,7 @@ namespace QuantConnect.Lean.Engine.Results
                         Algorithm.Portfolio.CashBook,
                         statistics: statistics.Summary,
                         runtimeStatistics: runtimeStatistics,
+                        orderEvents: null, // we are going to store order events separately
                         serverStatistics: serverStatistics,
                         alphaRuntimeStatistics: AlphaRuntimeStatistics));
 
@@ -409,7 +457,8 @@ namespace QuantConnect.Lean.Engine.Results
             CashBook cashbook,
             Dictionary<string, string> deltaStatistics,
             Dictionary<string, string> runtimeStatistics,
-            Dictionary<string, string> serverStatistics)
+            Dictionary<string, string> serverStatistics,
+            List<OrderEvent> deltaOrderEvents)
         {
             // break the charts into groups
             var current = new Dictionary<string, Chart>();
@@ -448,7 +497,7 @@ namespace QuantConnect.Lean.Engine.Results
             // these are easier to split up, not as big as the chart objects
             var packets = new[]
             {
-                new LiveResultPacket(_job, new LiveResult { Orders = deltaOrders}),
+                new LiveResultPacket(_job, new LiveResult { Orders = deltaOrders, OrderEvents = deltaOrderEvents}),
                 new LiveResultPacket(_job, new LiveResult { Holdings = holdings, Cash = cashbook}),
                 new LiveResultPacket(_job, new LiveResult
                 {
@@ -742,7 +791,7 @@ namespace QuantConnect.Lean.Engine.Results
 
                 //Create a packet:
                 var result = new LiveResultPacket(_job,
-                    new LiveResult(new LiveResultParameters(charts, orders, profitLoss, holdings, Algorithm.Portfolio.CashBook, statisticsResults.Summary, runtime)))
+                    new LiveResult(new LiveResultParameters(charts, orders, profitLoss, holdings, Algorithm.Portfolio.CashBook, statisticsResults.Summary, runtime, OrderEvents.ToList())))
                 {
                     ProcessingTime = (DateTime.UtcNow - StartTime).TotalSeconds
                 };
@@ -804,6 +853,14 @@ namespace QuantConnect.Lean.Engine.Results
 
                 if (live != null)
                 {
+                    if (live.Results.OrderEvents != null)
+                    {
+                        // we store order events separately
+                        StoreOrderEvents(_orderEventStoringDate, live.Results.OrderEvents);
+                        // lets null the orders events so that they aren't stored again and generate a giant file
+                        live.Results.OrderEvents = null;
+                    }
+
                     live.Results.AlphaRuntimeStatistics = AlphaRuntimeStatistics;
 
                     // we need to down sample

@@ -36,6 +36,16 @@ namespace QuantConnect.Lean.Engine.Results
     public abstract class BaseResultsHandler
     {
         /// <summary>
+        /// 
+        /// </summary>
+        protected int LastOrderEventCount;
+
+        /// <summary>
+        /// 
+        /// </summary>
+        protected ConcurrentQueue<OrderEvent> OrderEvents { get; }
+
+        /// <summary>
         /// The algorithms order id events
         /// </summary>
         /// <returns>Used to fetch the delta order events since the last update <see cref="GetDeltaOrders"/></returns>
@@ -160,6 +170,7 @@ namespace QuantConnect.Lean.Engine.Results
             ChartLock = new object();
             LogStore = new List<LogEntry>();
             OrderIdEvents = new ConcurrentQueue<int>();
+            OrderEvents = new ConcurrentQueue<OrderEvent>();
         }
 
         /// <summary>
@@ -169,6 +180,25 @@ namespace QuantConnect.Lean.Engine.Results
         public virtual void OrderEvent(OrderEvent newEvent)
         {
             OrderIdEvents.Enqueue(newEvent.OrderId);
+            OrderEvents.Enqueue(newEvent);
+        }
+
+        /// <summary>
+        /// Stores the order events
+        /// </summary>
+        /// <param name="utcTime">The utc time used to generate the file path</param>
+        /// <param name="orderEvents">The order events to store</param>
+        protected virtual void StoreOrderEvents(DateTime utcTime, List<OrderEvent> orderEvents)
+        {
+            if (orderEvents.Count <= 0)
+            {
+                return;
+            }
+
+            var path = $"{JobId}-order-events.json";
+            var data = JsonConvert.SerializeObject(orderEvents, Formatting.None);
+
+            File.WriteAllText(path, data);
         }
 
         /// <summary>
